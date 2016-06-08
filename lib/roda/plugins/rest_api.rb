@@ -2,7 +2,7 @@ class Roda
   module RodaPlugins
 
     module RestApi
-      
+
       class DefaultSerializer
         def serialize(result)
           result.is_a?(String) ? result : result.to_json
@@ -12,26 +12,26 @@ class Roda
       APPLICATION_JSON = 'application/json'.freeze
       SINGLETON_ROUTES = %i{ create new update show destroy edit }.freeze
       OPTS = {}.freeze
-      
+
       def self.load_dependencies(app, _opts = OPTS)
         app.plugin :all_verbs
         app.plugin :symbol_matchers
         app.plugin :header_matchers
         app.plugin :drop_body
       end
-      
+
       def self.configure(app, opts = OPTS)
         all_keys = Resource::OPTIONS.keys << :serialize
         if (opts.keys & all_keys).any?
           raise "For version 2.0 all options [#{Resource::OPTIONS.keys.join(' ')}] must be set at the api, version or resource level."
         end
       end
-            
+
       class Resource
-        
+
         attr_reader :request, :path, :singleton, :parent, :id_pattern
         attr_accessor :captures
-        
+
         OPTIONS = { singleton: false,
           primary_key: "id",
           parent_key: "parent_id",
@@ -41,7 +41,7 @@ class Roda
           serializer: RestApi::DefaultSerializer.new,
           wrapper: nil,
           resource: nil }.freeze
-                
+
         def initialize(path, request, parent, option_chain=[])
           @request = request
           @path = path.to_s
@@ -51,14 +51,14 @@ class Roda
             @path = ":id/#{@path}" unless @bare
           end
         end
-        
+
         [:list, :one, :save, :delete, :serialize].each do |meth|
           define_method meth do |&block|
             self.instance_variable_set("@#{meth}", block) if block
             self.instance_variable_get("@#{meth}") || ->(_){raise NotImplementedError, meth.to_s}
           end
         end
-        
+
         def content_type
           if @serializer && @serializer.respond_to?(:content_type)
             @serializer.content_type
@@ -66,21 +66,21 @@ class Roda
             @content_type
           end
         end
-        
+
         def opts
           @resource || {}
         end
-                        
+
         def routes(*routes)
           routes! if @routes
           yield if block_given?
           @routes = routes
         end
-        
+
         def permit(*permitted)
           @permitted = permitted
         end
-          
+
         def routes!
           unless @routes
             @routes = SINGLETON_ROUTES.dup
@@ -88,7 +88,7 @@ class Roda
           end
           @routes.each { |route| @request.send(route) }
         end
-        
+
         POST_BODY  = 'rack.input'.freeze
         FORM_INPUT = 'rack.request.form_input'.freeze
         FORM_HASH  = 'rack.request.form_hash'.freeze
@@ -100,7 +100,7 @@ class Roda
             blk.call(args)
           end
         end
-        
+
         def perform(method, id = nil)
           begin
             args = self.arguments(method, id)
@@ -113,9 +113,9 @@ class Roda
             @request.response.write e
           end
         end
-        
+
         protected
-        
+
         def arguments(method, id)
           args = if method === :save
             form = Rack::Request::FORM_DATA_MEDIA_TYPES.include?(@request.media_type)
@@ -129,7 +129,7 @@ class Roda
         end
 
         private
-        
+
         def traverse_options(option_chain)
           reverse_chain = option_chain.reverse
           OPTIONS.each_pair do |key, default|
@@ -148,7 +148,7 @@ class Roda
             @serialize = ->(res){@serializer.serialize(res)}
           end
         end
-        
+
         def symbolize_keys(args)
           _args = {}
           args.each do |k,v|
@@ -157,7 +157,7 @@ class Roda
           end
           _args
         end
-        
+
         def permitted_args(args, keypath = [])
           permitted = nil
           case args
@@ -176,7 +176,7 @@ class Roda
           end
           permitted
         end
-        
+
         def permitted?(keypath)
           return false unless @permitted
           permitted = @permitted
@@ -196,11 +196,11 @@ class Roda
             return false unless found
           end
         end
-      
+
       end
-            
+
       module RequestMethods
-        
+
         def api(options={}, &block)
           extract_resource_options options
           path = options.delete(:path) || 'api'
@@ -272,9 +272,9 @@ class Roda
           block ||= ->{@resource.perform(:one, "new")}
           get('new', options, &block)
         end
-        
+
         private
-        
+
         def extract_resource_options(options)
           @resource_options ||= []
           opts = {}
@@ -283,7 +283,7 @@ class Roda
           end
           @resource_options << opts
         end
-        
+
         def _path(path=nil)
           if @resource and @resource.singleton
             path = ['', true] unless path
@@ -292,7 +292,7 @@ class Roda
           end
           path
         end
-        
+
         def default_block(method)
           if @resource.singleton
             ->(){@resource.perform(method)}
@@ -300,21 +300,21 @@ class Roda
             ->(id){@resource.perform(method, id)}
           end
         end
-        
+
         CONTENT_TYPE = 'Content-Type'.freeze
 
         def block_result_body(result)
           if result && @resource
-              response[CONTENT_TYPE] = @resource.content_type
+              response[CONTENT_TYPE] = @resource.content_type unless response[CONTENT_TYPE]
               @resource.serialize.call(result)
             else
               super
           end
         end
-        
+
       end
     end
-    
+
     register_plugin(:rest_api, RestApi)
 
   end
